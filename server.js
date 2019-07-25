@@ -53,7 +53,7 @@ server.listen(8080, function() {
 const players = {};
 
 io.on('connect', function(socket) {
-  let thisPlayer;
+  let thisPlayer, enemyPlayer;
   console.log('User connected. id: ' + socket.id);
   players[socket.id] = {
     id: socket.id,
@@ -69,17 +69,48 @@ io.on('connect', function(socket) {
     console.log('Player ' + playerName + ' has joined the game');
     socket.emit('joined', 'You have joined the game!');
 
+    //console.log(players);
+
     thisPlayer.name = playerName;
     thisPlayer.state = 'READY';
 
-    if (players.length === 2) {
+    if (Object.keys(players).length === 2) {
+      for(let aPlayer in players) {
+        if (players[aPlayer].id !== socket.id) {
+          enemyPlayer = players[aPlayer];
+        }
+      }
       // start game
       socket.emit('ready');
     }
   });
 
-  socket.on('advance', function(playerName) {
+  /**
+   * {
+   *  state: GAMESTATE,
+   *  payload?: Die[]
+   * }
+   */
+  socket.on('advance', function({state, payload}) {
+    console.log('advance received. current state: ' + state);
 
+    // set the current state on the player object
+    players[socket.id].state = state;
+    // assign the dice to the player object if they're done rolling
+    if (state === 'WAITING_TO_FIGHT') {
+      players[socket.id].dice = payload;
+
+      //console.log(players);
+      console.log(thisPlayer);
+      console.log('------------------')
+      console.log(enemyPlayer);
+      // check to see if the other player is already ready
+      if (enemyPlayer && enemyPlayer.state === 'WAITING_TO_FIGHT') {
+        // advance and pass the enemy dice as payload
+        socket.emit('fight', enemyPlayer.dice);
+        socket.broadcast.emit('fight', thisPlayer.dice);
+      }
+    }
   });
 
 });
